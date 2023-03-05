@@ -1,0 +1,41 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+using OpenCvSharp;
+
+namespace Lesson_01
+{
+    class Program
+    {
+        static void Main(string[] args)
+        {
+            // Opens MP4 file (ffmpeg is probably needed)
+            //var capture = new VideoCapture("E:/Materials/0.avi"); //打开视频文件
+            //int sleepTime = (int)Math.Round(1000 / capture.Fps);
+
+            var capture = new VideoCapture(0); //打开本机摄像头
+            int sleepTime = 10;
+
+
+            using (var window = new Window("capture"))
+            {
+                // Frame image buffer
+                Mat image = new Mat();
+
+                // When the movie playback reaches end, Mat.data becomes NULL.
+                while (true)
+                {
+                    capture.Read(image); // same as cvQueryFrame
+                    if (image.Empty())
+                        break;
+
+                    window.ShowImage(image);
+                    Cv2.WaitKey(sleepTime);
+                }
+            }
+        }
+    }
+}
