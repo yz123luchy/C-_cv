@@ -1,0 +1,125 @@
+	//定义加载正样本数据和负样本数据的文件路径
+	string positive_path = "D:\\opencv_c++\\opencv_tutorial\\data\\dataset\\elec_watch\\positive\\";
+	string negative_path = "D:\\opencv_c++\\opencv_tutorial\\data\\dataset\\elec_watch\\negative\\";
+	//通过glob()将路径下的所有图像文件以string类型读取进来
+	vector<string> positive_images_str, negative_images_str;
+	glob(positive_path, positive_images_str);
+	glob(negative_path, negative_images_str);
+	//将string类型的图像数据转换为Mat类型
+	vector<Mat>positive_images, negative_images;
+	for (int i = 0; i < positive_images_str.size(); i++)
+	{
+		Mat positive_image = imread(positive_images_str[i]);			
+		resize(positive_image, positive_image, Size(64, 128));				
+		positive_images.push_back(positive_image);
+	}
+	for (int j = 0; j < negative_images_str.size(); j++)
+	{
+		Mat negative_image = imread(negative_images_str[j]);
+		resize(negative_image, negative_image, Size(64, 128));
+		negative_images.push_back(negative_image);
+	}
+
+	//分别获取正负样本中每张图像的HOG特征描述子，并进行标注
+	HOGDescriptor *hog_train = new HOGDescriptor;
+	vector<vector<float>> train_descriptors;
+	int positive_num = positive_images.size();
+	int negative_num = negative_images.size();
+	vector<int> labels;
+	for (int i = 0; i < positive_num; i++)
+	{
+		Mat gray;
+		cvtColor(positive_images[i], gray, COLOR_BGR2GRAY);			//计算HOG描述子时需要使用灰度图像
+		vector<float> descriptor;
+		hog_train->compute(gray, descriptor, Size(8, 8), Size(0, 0));
+		train_descriptors.push_back(descriptor);
+		labels.push_back(1);
+		
+	}
+	for (int j = 0; j < negative_num; j++)
+	{
+		Mat gray;
+		cvtColor(negative_images[j], gray, COLOR_BGR2GRAY);
+		vector<float> descriptor;
+		hog_train->compute(gray, descriptor, Size(8, 8), Size(0, 0));
+		train_descriptors.push_back(descriptor);
+		labels.push_back(-1);
+	}
+	//将训练数据vector转换为Mat对象，每一行为一个描述子，行数即为样本数
+	int width = train_descriptors[0].size();
+	int height = train_descriptors.size();
+	Mat train_data = Mat::zeros(Size(width, height), CV_32F);
+	for (int r = 0; r < height; r++)
+	{
+		for (int c = 0; c < width; c++)
+		{
+			train_data.at<float>(r, c) = train_descriptors[r][c];
+		}
+	}
+	//使用最优参数训练SVM分类器，并保存到与代码同目录下
+	auto train_svm = ml::SVM::create();
+	train_svm->trainAuto(train_data, ml::ROW_SAMPLE, labels);
+	train_svm->save("model.xml");
+	hog_train->~HOGDescriptor();
+	train_svm->clear();
+
+
+
+
+
+
+
+	//测试分类器
+	Mat test_image = imread("D:\\opencv_c++\\opencv_tutorial\\data\\dataset\\elec_watch\\test\\scene_02.jpg");
+	resize(test_image, test_image, Size(0,0), 0.2,0.2);
+	Mat test_gray_image;
+	cvtColor(test_image, test_gray_image, COLOR_BGR2GRAY);
+	HOGDescriptor* hog_test = new HOGDescriptor;
+	//加载训练好的SVM分类器
+	auto test_svm = ml::SVM::load("model.xml");
+	Rect winRect;
+	vector<float> descriptors;
+	vector<int>winRect_x, winRect_y;
+	for (int row = 64; row < test_image.rows -64; row += 8)
+	{
+		for (int col = 32; col < test_image.cols - 32; col += 8)
+		{
+			winRect.width = 64;
+			winRect.height = 128;
+			winRect.x = col - 32;
+			winRect.y = row - 64;
+			//计算当前窗口区域的HOG描述子，并转换为Mat对象
+			hog_test->compute(test_gray_image(winRect), descriptors);
+			Mat descriptor_mat = Mat::zeros(Size(descriptors.size(), 1), CV_32FC1);
+			for (int i = 0; i < descriptors.size(); i++)
+			{
+				descriptor_mat.at<float>(0, i) = descriptors[i];
+			}
+			//对当前窗口的描述子使用SVM模型进行预测，结果是1或-1
+			float result;
+			result = test_svm->predict(descriptor_mat);
+			if (result > 0)
+			{
+				//保存当前窗口左上角坐标
+				winRect_x.push_back(col - 32);
+				winRect_y.push_back(row - 64);
+			}
+		}
+	}
+	//如果存在检测出的对象框，则计算平均坐标点并绘制目标框
+	if (winRect_x.size() != 0)
+	{
+		int x = 0, y = 0;
+		for (int k = 0; k < winRect_x.size(); k++)
+		{
+			x += winRect_x[k];
+			y += winRect_y[k];
+		}
+		x = x / winRect_x.size();
+		y = y / winRect_y.size();
+		Rect dected_rect(x, y, 64, 128);
+		rectangle(test_image, dected_rect, Scalar(0, 255, 0), 1, 8, 0);
+	}
+	imshow("test_image", test_image);
+	hog_test->~HOGDescriptor();
+	test_svm->clear();
