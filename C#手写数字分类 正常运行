@@ -1,0 +1,177 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using OpenCvSharp;
+using OpenCvSharp.Extensions;
+using System.Collections;
+
+using System.IO;
+
+namespace ConsoleApp10
+{
+    class Program
+    {
+        static void Main(string[] args)
+        {
+            OpenCvSharp.HOGDescriptor hog = new OpenCvSharp.HOGDescriptor(
+            new OpenCvSharp.Size(16, 16),
+            new OpenCvSharp.Size(8, 8),
+            new OpenCvSharp.Size(4, 4),
+            new OpenCvSharp.Size(2, 2),
+    1);
+
+            string trainPath = "E:\\data_shuzi\\train";
+            string testPath = "E:\\data_shuzi\\test";
+
+            //制作训练集
+            int train_sample_count = 8;
+            int test_sample_count = 4;
+
+            //声明变量
+            Mat trainData, testData;
+            List<Mat> trainHOGDataVec = new List<Mat>();
+            List<Mat> testHOGDataVec = new List<Mat>();
+            //ArrayList trainLabel = new ArrayList(400);
+            //ArrayList testLabel = new ArrayList(80);
+            //Mat trainLabel = new Mat(400, 1, MatType.CV_8UC1);
+            //Mat testLabel = new Mat(80, 1, MatType.CV_8UC1);
+            Mat trainLabel = new Mat(16, 1, MatType.CV_32SC1);
+            Mat testLabel = new Mat(8, 1, MatType.CV_32SC1);
+
+
+            //组织训练数据
+            int trainNums = 0;
+            for (int i = 1; i < 3; i++)
+            {
+                string path = trainPath + "\\" + i;
+                DirectoryInfo TheFolder = new DirectoryInfo(path);
+                foreach (FileInfo NextFile in TheFolder.GetFiles())
+                {
+                    Console.WriteLine(NextFile.FullName);
+
+                    
+                    //Mat input1 = Cv2.ImRead(NextFile.FullName, ImreadModes.AnyColor);
+                    //using (Mat mat = getMat());
+                    //Mat temp1 = new Mat();
+                    // Cv2.CvtColor(input1, temp1, ColorConversionCodes.BGR2GRAY);//色彩空间转换
+                    // Mat temp = Cv2.ImRead(NextFile.FullName, ImreadModes.Grayscale);
+                    Mat t1 = Cv2.ImRead(NextFile.FullName, ImreadModes.Grayscale);
+                    Mat temp1 = new Mat();
+                    Cv2.Resize(t1, temp1, new OpenCvSharp.Size(16, 16),0.5, 0.5, InterpolationFlags.Linear);
+                    float[] descriptors = hog.Compute(temp1, new OpenCvSharp.Size(1, 1), new OpenCvSharp.Size(0, 0));
+                    Mat des = OpenCvSharp.InputArray.Create(descriptors).GetMat();
+                    Console.WriteLine(des.Size());
+                    trainHOGDataVec.Add(des.Reshape(0, 1).Clone());
+                    //Console.WriteLine(trainHOGDataVec[0]);
+                    trainLabel.Set<float>(trainNums, i);
+                    //trainLabel.Add(i);
+                    //trainLabel.At<int>(trainNums,1) = i;
+                    trainNums++;
+                    //Console.WriteLine(trainLabel.At(trainNums));
+                    //Console.WriteLine(trainLabel);
+                    Console.WriteLine(trainNums);
+                }
+            }
+
+            //组织测试数据
+            int testNums = 0;
+            for (int i = 1; i < 3; i++)
+            {
+                string path = testPath + "\\" + i;
+                DirectoryInfo TheFolder = new DirectoryInfo(path);
+                foreach (FileInfo NextFile in TheFolder.GetFiles())
+                {
+                    Console.WriteLine(NextFile.FullName);
+
+                    //Mat input = new Mat(NextFile.FullName, ImreadModes.AnyColor);
+                    //Mat input2 = Cv2.ImRead(NextFile.FullName, ImreadModes.AnyColor);
+                    //Mat temp2 = new Mat();
+                    //Cv2.CvtColor(input2, temp2, ColorConversionCodes.BGR2GRAY);//色彩空间转换
+                    //Mat temp = Cv2.ImRead(NextFile.FullName, ImreadModes.Grayscale);
+                    Mat t2 = Cv2.ImRead(NextFile.FullName, ImreadModes.Grayscale);
+
+                    Mat temp2 = new Mat();
+                    Cv2.Resize(t2, temp2, new OpenCvSharp.Size(16, 16), 0.5, 0.5, InterpolationFlags.Linear);
+
+                    float[] descriptors = hog.Compute(temp2, new OpenCvSharp.Size(1, 1), new OpenCvSharp.Size(0, 0));
+                    Mat des = OpenCvSharp.InputArray.Create(descriptors).GetMat();
+                    Console.WriteLine(des.Size());
+                    testHOGDataVec.Add(des.Reshape(0, 1).Clone());
+                    //Console.WriteLine(testHOGDataVec[0]);
+                    testLabel.Set<float>(testNums, i);
+                    //testLabel.At<int>(testNums,1) = i;
+                    testNums++;
+                    Console.WriteLine(testNums);
+                    //Console.WriteLine(testLabel.At(trainNums));
+                }
+            }
+
+
+           
+
+            //创建SVM分类器
+            OpenCvSharp.ML.SVM svm = OpenCvSharp.ML.SVM.Create();
+            svm.Type = OpenCvSharp.ML.SVM.Types.CSvc;
+            svm.KernelType = OpenCvSharp.ML.SVM.KernelTypes.Rbf;
+            svm.C = 2;
+            svm.Gamma = 0.5;
+
+            trainData = new Mat(16, hog.GetDescriptorSize(), MatType.CV_32FC1);
+            for (int i = 0; i < 16; ++i)
+            {
+                trainHOGDataVec[i].CopyTo(trainData.Row((int)i));
+                //Console.WriteLine(trainHOGDataVec[i]);
+            }
+            Console.WriteLine(trainHOGDataVec.Count);
+            Console.WriteLine(Cv2.Format(trainLabel));
+            Console.WriteLine(trainData.Size());
+
+
+            testData = new Mat(8, hog.GetDescriptorSize(), MatType.CV_32FC1);
+            for (int i = 0; i < 8; ++i)
+            {
+                testHOGDataVec[i].CopyTo(testData.Row((int)i));
+            }
+            Console.WriteLine(testHOGDataVec.Count);
+            Console.WriteLine(Cv2.Format(testLabel));
+            Console.WriteLine(testData.Size());
+            //训练
+            Console.WriteLine("开始训练......\n");
+            //trainLabel.ConvertTo(trainLabel, MatType.CV_32S);
+            svm.Train(trainData, OpenCvSharp.ML.SampleTypes.RowSample, trainLabel);
+            Console.WriteLine("训练完成......\n");
+            svm.Save("digits_hog_svm.xml");
+
+            //测试
+            Mat result = new Mat();
+            Console.WriteLine("开始测试......\n");
+            svm.Predict(testData, result);
+            //输出结果
+            int t = 0, f = 0;
+            for (int i = 0; i < 8; i++)
+            {
+                int predict = (int)(result.At<float>(i));
+                int actual = (int)(testLabel.At<int>(i));
+                Console.WriteLine("预测结果："+ predict);
+                Console.WriteLine("label结果："+ actual);
+                if (predict == actual)
+                {
+                    t++;
+                }
+                else
+                {
+                    f++;
+                }
+            }
+            Console.WriteLine("测试完成......\n");
+            //输出结果
+            double accuracy = (t * 1.0) / (t + f);
+            Console.WriteLine("测试总数：" + test_sample_count);
+            Console.WriteLine("正确：" + t);
+            Console.WriteLine("错误：" + f);
+        }
+    }
+}
+
