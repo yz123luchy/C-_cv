@@ -1,0 +1,147 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using OpenCvSharp;
+using OpenCvSharp.Extensions;
+using System.Collections;
+
+using System.IO;
+
+namespace ConsoleApp10
+{
+    class Program
+    {
+        static void Main(string[] args)
+        {
+            OpenCvSharp.HOGDescriptor hog = new OpenCvSharp.HOGDescriptor(
+            new OpenCvSharp.Size(32, 32),
+            new OpenCvSharp.Size(16,16),
+            new OpenCvSharp.Size(8, 8),
+            new OpenCvSharp.Size(4, 4),
+    3);
+
+            string trainPath = "E:\\shijue_data\\data_luoding\\train";
+            string testPath = "E:\\shijue_data\\data_luoding\\test";
+
+            //制作训练集
+            int train_sample_count = 60;
+            int test_sample_count = 20;
+
+            //声明变量
+            Mat trainData, testData;
+            List<Mat> trainHOGDataVec = new List<Mat>();
+            List<Mat> testHOGDataVec = new List<Mat>();
+            Mat trainLabel = new Mat(train_sample_count, 1, MatType.CV_32SC1);
+            Mat testLabel = new Mat(test_sample_count, 1, MatType.CV_32SC1);
+
+
+            //组织训练数据
+            int trainNums = 0;
+            for (int i = 1; i < 3; i++)
+            {
+                string path = trainPath + "\\" + i;
+                DirectoryInfo TheFolder = new DirectoryInfo(path);
+                foreach (FileInfo NextFile in TheFolder.GetFiles())
+                {
+                    Console.WriteLine(NextFile.FullName);
+                    Mat t1 = Cv2.ImRead(NextFile.FullName, ImreadModes.Grayscale);
+                    Mat temp1 = new Mat();
+                    Cv2.Resize(t1, temp1, new OpenCvSharp.Size(32,32),0.5, 0.5, InterpolationFlags.Linear);
+                    float[] descriptors = hog.Compute(temp1, new OpenCvSharp.Size(8, 8), new OpenCvSharp.Size(0, 0));
+                    Mat des = OpenCvSharp.InputArray.Create(descriptors).GetMat();
+                    Console.WriteLine(des.Size());
+                    trainHOGDataVec.Add(des.Reshape(0, 1).Clone());
+                    trainLabel.Set<float>(trainNums, i);
+                    trainNums++;
+                    Console.WriteLine(trainNums);
+                }
+            }
+
+            //组织测试数据
+            int testNums = 0;
+            for (int i = 1; i < 3; i++)
+            {
+                string path = testPath + "\\" + i;
+                DirectoryInfo TheFolder = new DirectoryInfo(path);
+                foreach (FileInfo NextFile in TheFolder.GetFiles())
+                {
+                    Console.WriteLine(NextFile.FullName);
+                    Mat t2 = Cv2.ImRead(NextFile.FullName, ImreadModes.Grayscale);
+
+                    Mat temp2 = new Mat();
+                    Cv2.Resize(t2, temp2, new OpenCvSharp.Size(32, 32), 0.5, 0.5, InterpolationFlags.Linear);
+
+                    float[] descriptors = hog.Compute(temp2, new OpenCvSharp.Size(8, 8), new OpenCvSharp.Size(0, 0));
+                    Mat des = OpenCvSharp.InputArray.Create(descriptors).GetMat();
+                    Console.WriteLine(des.Size());
+                    testHOGDataVec.Add(des.Reshape(0, 1).Clone());
+                    testLabel.Set<float>(testNums, i);
+                    testNums++;
+                    Console.WriteLine(testNums);
+                }
+            }
+            //创建SVM分类器
+            OpenCvSharp.ML.SVM svm = OpenCvSharp.ML.SVM.Create();
+            svm.Type = OpenCvSharp.ML.SVM.Types.CSvc;
+            svm.KernelType = OpenCvSharp.ML.SVM.KernelTypes.Rbf;
+            svm.C = 2;
+            svm.Gamma = 0.1;
+
+            trainData = new Mat(train_sample_count, hog.GetDescriptorSize(), MatType.CV_32FC1);
+            for (int i = 0; i < train_sample_count; ++i)
+            {
+                trainHOGDataVec[i].CopyTo(trainData.Row((int)i));
+            }
+            Console.WriteLine(trainHOGDataVec.Count);
+            Console.WriteLine(Cv2.Format(trainLabel));
+            Console.WriteLine(trainData.Size());
+            testData = new Mat(test_sample_count, hog.GetDescriptorSize(), MatType.CV_32FC1);
+            for (int i = 0; i < test_sample_count; ++i)
+            {
+                testHOGDataVec[i].CopyTo(testData.Row((int)i));
+            }
+            Console.WriteLine(testHOGDataVec.Count);
+            Console.WriteLine(Cv2.Format(testLabel));
+            Console.WriteLine(testData.Size());
+            //训练
+            Console.WriteLine("开始训练......\n");
+            //trainLabel.ConvertTo(trainLabel, MatType.CV_32S);
+            svm.Train(trainData, OpenCvSharp.ML.SampleTypes.RowSample, trainLabel);
+            Console.WriteLine("训练完成......\n");
+            svm.Save("digits_hog_svm.xml");
+
+            //测试
+            Mat result = new Mat();
+            Console.WriteLine("开始测试......\n");
+            svm.Predict(testData, result);
+            //输出结果
+            int t = 0, f = 0,n = 1;
+            for (int i = 0; i < test_sample_count; i++)
+            {
+                int predict = (int)(result.At<float>(i));
+                int actual = (testLabel.At<int>(i));
+                Console.WriteLine("预测结果："+ predict);
+                Console.WriteLine("label结果："+ actual);
+                if (predict == actual)
+                {
+                    t++;
+                }
+                else
+                {
+                    Console.WriteLine("第"+n+"个识别错误");
+                    f++;
+                }
+                n++;
+            }
+            Console.WriteLine("测试完成......\n");
+            //输出结果
+            double accuracy = (t * 1.0) / (t + f);
+            Console.WriteLine("测试总数：" + test_sample_count);
+            Console.WriteLine("正确：" + t);
+            Console.WriteLine("错误：" + f);
+        }
+    }
+}
+
