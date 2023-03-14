@@ -1,0 +1,48 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+ 
+using OpenCvSharp;
+using OpenCvSharp.Features2D;
+ 
+namespace Lesson_32
+{
+    class Program
+    {
+        static void Main(string[] args)
+        {
+            Mat srcImg = Cv2.ImRead("00.jpg");
+            Cv2.ImShow("src", srcImg);
+            Mat srcImg2 = Cv2.ImRead("01.jpg");
+            Cv2.ImShow("src2", srcImg2);
+ 
+ 
+            SIFT sift = SIFT.Create(1000);
+            KeyPoint[] keyPoints = sift.Detect(srcImg);
+            KeyPoint[] keyPoints2 = sift.Detect(srcImg2);
+ 
+            Random random = new Random();
+            for (int i = 0; i < keyPoints.Length; i++)
+            {
+                Point ptCorner = new Point();
+                ptCorner.X = (int)keyPoints[i].Pt.X;
+                ptCorner.Y = (int)keyPoints[i].Pt.Y;
+                Cv2.Circle(srcImg, ptCorner, 3, new Scalar(random.Next(0, 255), random.Next(0, 255), random.Next(0, 255)), -1);
+            }
+ 
+            for (int i = 0; i < keyPoints2.Length; i++)
+            {
+                Point ptCorner = new Point();
+                ptCorner.X = (int)keyPoints2[i].Pt.X;
+                ptCorner.Y = (int)keyPoints2[i].Pt.Y;
+                Cv2.Circle(srcImg2, ptCorner, 3, new Scalar(random.Next(0, 255), random.Next(0, 255), random.Next(0, 255)), -1);
+            }
+ 
+            Cv2.ImShow("SIFT", srcImg);
+            Cv2.ImShow("SIFT2", srcImg2);
+            Cv2.WaitKey(0);
+        }
+    }
+}
