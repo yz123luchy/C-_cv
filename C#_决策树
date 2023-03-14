@@ -1,0 +1,240 @@
+//Example 21-1. Creating and training a decision tree
+ 
+#include <opencv2/opencv.hpp>
+#include <stdio.h>
+#include <iostream>
+ 
+using namespace std;
+using namespace cv;
+ 
+void help(char **argv) {
+  cout << "\n\n"
+       << "Using binary decision trees to learn to recognize poisonous\n"
+       << "    from edible mushrooms based on visible attributes.\n" 
+       << "    This program demonstrates how to create and a train a \n"
+       << "    decision tree using ml library in OpenCV.\n"
+       << "Call:\n" << argv[0] << " <csv-file-path>\n\n"
+       << "\nIf you don't enter a file, it defaults to ../mushroom/agaricus-lepiota.data\n"
+       << endl;
+}
+ 
+int main(int argc, char *argv[]) {
+  // If the caller gave a filename, great. Otherwise, use a default.
+  //
+  const char *csv_file_name = argc >= 2 ? argv[1] : "../mushroom/agaricus-lepiota.data";
+  cout << "OpenCV Version: " << CV_VERSION << endl;
+  help(argv);
+ 
+  // Read in the CSV file that we were given.
+  //
+  cv::Ptr<cv::ml::TrainData> data_set =
+      cv::ml::TrainData::loadFromCSV(csv_file_name, // Input file name
+                                     0, // Header lines (ignore this many)
+                                     0, // Responses are (start) at thie column
+                                     1, // Inputs start at this column
+                                     "cat[0-22]" // All 23 columns are categorical
+                                     );
+  // Use defaults for delimeter (',') and missch ('?')
+  // Verify that we read in what we think.
+  //
+  int n_samples = data_set->getNSamples();
+  if (n_samples == 0) {
+    cerr << "Could not read file: " << csv_file_name << endl;
+    exit(-1);
+  } else {
+    cout << "Read " << n_samples << " samples from " << csv_file_name << endl;
+  }
+ 
+  // Split the data, so that 90% is train data
+  //
+  data_set->setTrainTestSplitRatio(0.90, false);
+  int n_train_samples = data_set->getNTrainSamples();
+  int n_test_samples = data_set->getNTestSamples();
+  cout << "Found " << n_train_samples << " Train Samples, and "
+       << n_test_samples << " Test Samples" << endl;
+ 
+  // Create a DTrees classifier.
+  //
+  cv::Ptr<cv::ml::RTrees> dtree = cv::ml::RTrees::create();
+  // set parameters
+  //
+  // These are the parameters from the old mushrooms.cpp code
+  // Set up priors to penalize "poisonous" 10x as much as "edible"
+  //
+  float _priors[] = {1.0, 10.0};
+  cv::Mat priors(1, 2, CV_32F, _priors);
+  dtree->setMaxDepth(8);
+  dtree->setMinSampleCount(10);
+  dtree->setRegressionAccuracy(0.01f);
+  dtree->setUseSurrogates(false /* true */);
+  dtree->setMaxCategories(15);
+  dtree->setCVFolds(0 /*10*/); // nonzero causes core dump
+  dtree->setUse1SERule(true);
+  dtree->setTruncatePrunedTree(true);
+  // dtree->setPriors( priors );
+  dtree->setPriors(cv::Mat()); // ignore priors for now...
+  // Now train the model
+  // NB: we are only using the "train" part of the data set
+  //
+  dtree->train(data_set);
+ 
+  // Having successfully trained the data, we should be able
+  // to calculate the error on both the training data, as well
+  // as the test data that we held out.
+  //
+  cv::Mat results;
+  float train_performance = dtree->calcError(data_set,
+                                             false, // use train data
+                                             results // cv::noArray()
+                                             );
+  std::vector<cv::String> names;
+  data_set->getNames(names);
+  Mat flags = data_set->getVarSymbolFlags();
+ 
+  // Compute some statistics on our own:
+  //
+  {
+    cv::Mat expected_responses = data_set->getResponses();
+    int good = 0, bad = 0, total = 0;
+    for (int i = 0; i < data_set->getNTrainSamples(); ++i) {
+      float received = results.at<float>(i, 0);
+      float expected = expected_responses.at<float>(i, 0);
+      cv::String r_str = names[(int)received];
+      cv::String e_str = names[(int)expected];
+      cout << "Expected: " << e_str << ", got: " << r_str << endl;
+      if (received == expected)
+        good++;
+      else
+        bad++;
+      total++;
+    }
+    cout << "Correct answers: " <<(float(good)/total) <<" % " << endl;
+                cout << "Incorrect answers: " << (float(bad) / total) << "%"
+         << endl;
+  }
+  float test_performance = dtree->calcError(data_set,
+                                            true, // use test data
+                                            results // cv::noArray()
+                                            );
+  cout << "Performance on training data: " << train_performance << "%" << endl;
+  cout << "Performance on test data: " <<test_performance <<" % " <<endl;
+  return 0;
+}
+
+
+
+
+//读取数据
+int[,] att = GetTArray(@"C:\Users\xiaomao\Desktop\mushroom数据集\agaricus-lepiota.train.data");
+//读取标签，多冗余读取了一次文件，主要是为了区分清楚步骤
+int[] label = GetTLabel(@"C:\Users\xiaomao\Desktop\mushroom数据集\agaricus-lepiota.train.data");
+InputArray array = InputArray.Create(att);
+InputArray outarray = InputArray.Create(label);
+ 
+//创建决策树，这里也可以用RTrees，据说比Dtrees效果更好
+OpenCvSharp.ML.DTrees dtrees = OpenCvSharp.ML.DTrees.Create();
+dtrees.MaxDepth = 8;
+dtrees.MinSampleCount = 10;
+dtrees.RegressionAccuracy = 0.01f;
+dtrees.UseSurrogates = false;
+dtrees.MaxCategories = 15;
+dtrees.CVFolds = 0;
+dtrees.Use1SERule = true;
+dtrees.TruncatePrunedTree = true;
+ 
+//进行训练
+dtrees.Train(array, OpenCvSharp.ML.SampleTypes.RowSample, outarray);
+//保存模型
+dtrees.Save(@"C:\Users\xiaomao\Desktop\1.xml");
+
+
+
+
+
+
+//从mushroom数据集读取数据，数据集一共8124条数据，取8000条进行训练
+public int[,] GetTArray(string filepath)
+{
+    int[,] att = new int[8000, 22];
+    using (StreamReader sin = new StreamReader(new FileStream(filepath, FileMode.Open, FileAccess.Read, FileShare.Read)))
+    {
+        int pos = 0;
+        for (string str = sin.ReadLine(); str != null; str = sin.ReadLine())
+        {
+            //分割每行数据
+            string[] temp = str.Split(',');
+            for(int i=1; i< temp.Length; i++)
+            {
+                //这里是把字母转ascii码，否则InputArray函数及train都不允许
+                //实际上就是标准化数据
+                //第一列不要
+                att[pos, i-1] = System.Text.Encoding.ASCII.GetBytes(temp[i])[0];
+            }
+            pos++;
+        }
+    }
+ 
+    return att;
+}
+ 
+//读取标签，就是从数据集中读取第一列
+public int[] GetTLabel(string filepath)
+{
+    int[] att = new int[8000];
+    using (StreamReader sin = new StreamReader(new FileStream(filepath, FileMode.Open, FileAccess.Read, FileShare.Read)))
+    {
+        int pos = 0;
+        for (string str = sin.ReadLine(); str != null; str = sin.ReadLine())
+        {
+            string[] temp = str.Split(',');
+            att[pos] = System.Text.Encoding.ASCII.GetBytes(temp[0])[0];
+            pos++;
+        }
+    }
+ 
+    return att;
+}
+ 
+//读取测试数据到list
+public List<int[]> GetTestArray(string filepath)
+{
+    List<int[]> att = new List<int[]>();
+    using (StreamReader sin = new StreamReader(new FileStream(filepath, FileMode.Open, FileAccess.Read, FileShare.Read)))
+    {
+        for (string str = sin.ReadLine(); str != null; str = sin.ReadLine())
+        {
+            string[] temp = str.Split(',');
+            int[] vs = new int[temp.Length];
+            for (int i = 1; i < temp.Length; i++)
+            {
+                vs[i-1] = System.Text.Encoding.ASCII.GetBytes(temp[i])[0];
+            }
+            att.Add(vs);
+        }
+    }
+ 
+    return att;
+}
+
+
+
+
+
+
+
+
+
+OpenCvSharp.ML.DTrees tree = OpenCvSharp.ML.DTrees.Load(@"C:\Users\xiaomao\Desktop\1.xml");
+List<int[]> att = GetTestArray(@"C:\Users\xiaomao\Desktop\mushroom数据集\agaricus-lepiota.test.data");
+ 
+//循环进行预测，应该可以批量预测，没进行测试
+for(int i=0;i <att.Count; i++)
+{
+    Mat p = new Mat(1, 22, OpenCvSharp.MatType.CV_32F, att[i]);
+    float rrr = tree.Predict(p);
+    System.Console.WriteLine("" + rrr);
+}
+
+
+
+
