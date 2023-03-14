@@ -1,0 +1,76 @@
+using System;
+using OpenCvSharp;
+using OpenCvSharp.CPlusPlus;
+ 
+namespace CppStyleSamplesCS
+{
+    class sift_a
+    {
+        public void MatchBySift(Mat src1, Mat src2)
+        {
+            
+            Mat gray1 = new Mat();
+            Mat gray2 = new Mat();
+ 
+            Cv2.CvtColor(src1, gray1, ColorConversion.BgrToGray);
+            Cv2.CvtColor(src2, gray2, ColorConversion.BgrToGray);
+            Cv2.NamedWindow("gray", 0);
+            Cv2.ImShow("gray", gray1);
+ 
+            SIFT sift = new SIFT();
+ 
+            /*将特征，极值点放入keypoint*/
+            KeyPoint[] keypoints1, keypoints2;
+            MatOfFloat descriptors1 = new MatOfFloat();
+            MatOfFloat descriptors2 = new MatOfFloat();
+            sift.Run(gray1, null, out keypoints1, descriptors1);
+            sift.Run(gray2, null, out keypoints2, descriptors2);
+            /*keypoints内部有以下内容
+            angle: 特征点的方向，值在0-360
+            class_id: 用于聚类id,没有进行聚类时为-1
+            octave: 特征点所在的高斯金差分字塔组
+            pt: 特征点坐标
+            response: 特征点响应强度，代表了该点时特征点的程度（特征点分数排序时，会根据特征点强度）
+            size:特征点领域直径*/
+            int len = keypoints1.Length;
+            int len1 = keypoints2.Length;
+            int same = 0;
+            foreach (dynamic j in keypoints1)
+            {
+                foreach(dynamic i in keypoints2)
+                {
+                    if((int)j.Pt.X==(int)i.Pt.X && (int)j.Pt.Y == (int)i.Pt.Y)
+                    {
+                        if (j.Angle == i.Angle && j.Size == i.Size)
+                        {
+                            Console.WriteLine("{0},{1}", j.Angle, i.Angle);
+                            same++;
+                        }
+                    }
+                }
+               
+            }
+            Console.WriteLine("{0},{1}",same,len);
+            Console.ReadKey();
+        }
+        class test
+        {
+            static void Main(string[] args)
+            {
+                Mat src1 = new Mat(@"C:\Users\林皓天\Desktop\城市\6.jpg",LoadMode.Unchanged);
+                Mat src2 = Cv2.ImRead(@"C:\Users\林皓天\Desktop\城市\9.jpg");
+                /*两种方法将将图像文件存入src1，2*/
+ 
+            Cv2.NamedWindow("gbr", 0);
+                /*这样图像才能显示完全*/
+                Cv2.ImShow("gbr", src1);
+ 
+                sift_a test1 = new sift_a();
+                test1.MatchBySift(src1, src2);
+ 
+                Cv2.WaitKey(0);
+                /*让图像显示，until摁下0*/
+            }
+        }
+    }
+}
