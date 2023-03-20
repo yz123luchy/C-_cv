@@ -1,0 +1,114 @@
+import os
+import xml.dom.minidom
+import cv2
+from skimage.io import imread, imshow
+from skimage import io
+from PIL import Image 
+#操作图片的库
+import matplotlib.pyplot as plt 
+#显示图像用的
+import numpy as np
+
+
+import os
+import fnmatch
+def create_dir_not_exist(path):
+    if not os.path.exists(path):
+        os.mkdir(path)
+        
+def getAllJpgPng(path):
+	# 返回的是所有jpg和png图片的名称列表
+    res = []
+    for folderName, subFolders,fileNames in os.walk(path):
+        for filename in fileNames:
+            if fnmatch.fnmatch(filename, '*.xml'):
+            #or fnmatch.fnmatch(filename, '*.png'):
+                res.append(filename)
+    return res
+path_data = './luoding_weizhi'
+jpgs = getAllJpgPng(path_data)
+print(jpgs)
+
+
+
+k = 1
+for name in jpgs:
+    path_pic = path_data + '/'+name[:-3]+'jpg'
+    path_xml = path_data + '/'+name
+    
+    DOMTree = xml.dom.minidom.parse(path_xml)
+     # 得到文档元素对象
+    collection = DOMTree.documentElement
+  
+    
+    # 读取图片
+    img = cv2.imread(path_pic)
+    img_size_list=collection.getElementsByTagName('size')
+    
+    for img_size in img_size_list:
+        #img_width_list = img_size.getElementsByTagName('width')
+        #img_height_list = img_size.getElementsByTagName('height')
+        #img_height = img_height_list[0].childNodes[0].data
+        #cv2.putText(img, img_width, (10, 40), cv2.FONT_HERSHEY_COMPLEX, 0.7, (0, 255, 0), thickness=2)
+        #cv2.putText(img, img_height, (10, 60), cv2.FONT_HERSHEY_COMPLEX, 0.7, (0, 255, 0), thickness=2)
+
+        
+       # 得到标签名为object的信息
+        objectlist = collection.getElementsByTagName("object")
+        i=1
+        plt.figure(figsize=(12,10))
+        for objects in objectlist:
+            
+            
+            namelist = objects.getElementsByTagName('name')
+            objectname = namelist[0].childNodes[0].data
+            print(objectname)
+            
+            bndbox = objects.getElementsByTagName('bndbox')
+            for box in bndbox:
+                x1_list = box.getElementsByTagName('xmin')
+                x1 = int(x1_list[0].childNodes[0].data)
+                y1_list = box.getElementsByTagName('ymin')
+                y1 = int(y1_list[0].childNodes[0].data)
+                x2_list = box.getElementsByTagName('xmax')
+                x2 = int(x2_list[0].childNodes[0].data)
+                y2_list = box.getElementsByTagName('ymax')
+                y2 = int(y2_list[0].childNodes[0].data)
+                luoding_1 = img[y1:y2,x1:x2]
+                file_path = './' + objectname + '_test/'
+                create_dir_not_exist(file_path)
+                cv2.imwrite(file_path + str(k)+'.jpg', luoding_1)
+                plt.subplot(4,4,i)
+                plt.imshow(luoding_1)
+                print(luoding_1.shape)
+                i = i+1
+                k= k + 1
+        plt.show()
+
+
+
+import xml.etree.ElementTree as ET
+import os
+import glob
+def GetAnnotBoxLoc(file_dir):
+    labelName= set([])
+    files=glob.glob(file_dir)
+    for i in range(len(files)):
+        AnotPath=files[i]
+        tree = ET.ElementTree(file=AnotPath)
+        root = tree.getroot()
+        ObjectSet = root.findall('object/name')
+        for Object in ObjectSet:
+            labelName.add(Object.text)
+    return list(labelName)
+for name in jpgs:
+    path_xml = path_data + '/'+name[:-3]+'xml'
+    s=GetAnnotBoxLoc(path_xml)
+    print(s)
+
+
+
+
+
+
+
