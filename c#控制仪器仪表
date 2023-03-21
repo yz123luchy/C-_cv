@@ -1,0 +1,30 @@
+using Ivi.Visa;
+using NationalInstruments.Visa;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+
+namespace VISADEMO1
+{
+    class Program
+    {
+        static void Main(string[] args)
+        {
+
+            /*************  Simple Message-Based I/O Operations  *********/
+
+             TcpipSession section = new TcpipSession("TCPIP0::192.168.0.27::inst0::INSTR");
+            //TcpipSession 类来自于 NationalInstruments.Visa ，因此需要再VSstadio 里面添加引用; 
+            //C:\ProgramFiles(x86)\IVIFoundation\VISA\VisaCom\v4.0.30319\NIVISA.NET
+
+            IMessageBasedRawIO io = section.RawIO;
+            //IMessageBasedRawIO 来自于Ivi.Visa，因此需要添加DLL 引用，
+            //C:\Program Files (x86)\IVI Foundation\VISA\Microsoft.NET\Framework32\v2.0.50727\VISA.NET //Shared Components 5.11.0\Ivi.Visa.dll
+
+            
+            io.Write("TRAC1:DATA? TRACE1");
+            String s = io.ReadString();
+             Console.WriteLine(s);
+             section.Dispose();
+             Console.ReadLine();
